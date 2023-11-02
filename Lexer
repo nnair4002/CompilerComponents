@@ -1,0 +1,338 @@
+// Nishant Nair
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <map>
+#include <cctype>
+#include <map>
+#include <string>
+#include <cstdlib>
+#include "lex.h"
+
+using namespace std;
+
+ostream& operator<<(ostream& out, const LexItem& tok) {
+    if (tok.GetToken() == WRITELN) {
+        cout << "WRITELN" << endl;
+    }
+    else if (tok.GetToken() == IF) {
+        cout << "IF" << endl;
+    }
+    else if (tok.GetToken() == ELSE) {
+        cout << "ELSE" << endl;
+    }
+    else if (tok.GetToken() == PROGRAM) {
+        cout << "PROGRAM" << endl;
+    }
+    else if (tok.GetToken() == BEGIN) {
+        cout << "BEGIN" << endl;
+    }
+    else if (tok.GetToken() == END) {
+        cout << "IDENT: \"END\"" << endl;
+    }
+    else if (tok.GetToken() == IDENT) {
+        cout << "IDENT: \"" << tok.GetLexeme() << "\"" << endl;
+    }
+    else if (tok.GetToken() == BCONST) {
+        cout << "BCONST: \"" << tok.GetLexeme() << "\"" << endl;
+    }
+    else if (tok.GetToken() == ICONST) {
+        cout << "ICONST: \"" << tok.GetLexeme() << "\"" << endl;
+    }
+    else if (tok.GetToken() == RCONST) {
+        cout << "RCONST: \"" << tok.GetLexeme() << "\"" << endl;
+    }
+    else if (tok.GetToken() == SCONST) {
+        cout << "SCONST: \"" << tok.GetLexeme().substr(1, tok.GetLexeme().length() - 2) << "\"" << endl;
+    }
+    else if (tok.GetToken() == PLUS) {
+        cout << "PLUS" << endl;
+    }
+    else if (tok.GetToken() == MINUS) {
+        cout << "MINUS" << endl;
+    }
+    else if (tok.GetToken() == MULT) {
+        cout << "MULT" << endl;
+    }
+    else if (tok.GetToken() == DIV) {
+        cout << "DIV" << endl;
+    }
+    else if (tok.GetToken() == IDIV) {
+        cout << "IDIV" << endl;
+    }
+    else if (tok.GetToken() == MOD) {
+        cout << "MOD" << endl;
+    }
+    else if (tok.GetToken() == ASSOP) {
+        cout << "ASSOP" << endl;
+    }
+    else if (tok.GetToken() == EQ) {
+        cout << "EQ" << endl;
+    }
+    else if (tok.GetToken() == GTHAN) {
+        cout << "GTHAN" << endl;
+    }
+    else if (tok.GetToken() == LTHAN) {
+        cout << "LTHAN" << endl;
+    }
+    else if (tok.GetToken() == AND) {
+        cout << "AND" << endl;
+    }
+    else if (tok.GetToken() == OR) {
+        cout << "OR" << endl;
+    }
+    else if (tok.GetToken() == NOT) {
+        cout << "NOT" << endl;
+    }
+    else if (tok.GetToken() == COMMA) {
+        cout << "COMMA" << endl;
+    }
+    else if (tok.GetToken() == SEMICOL) {
+        cout << "SEMICOL" << endl;
+    }
+    else if (tok.GetToken() == LPAREN) {
+        cout << "LPAREN" << endl;
+    }
+    else if (tok.GetToken() == RPAREN) {
+        cout << "RPAREN" << endl;
+    }
+    else if (tok.GetToken() == DOT) {
+        cout << "DOT" << endl;
+    }
+    else if (tok.GetToken() == COLON) {
+        cout << "COLON" << endl;
+    }
+    else if (tok.GetToken() == VAR) {
+        cout << "VAR" << endl;
+    }
+    else if (tok.GetToken() == INTEGER) {
+        cout << "INTEGER" << endl;
+    }
+    else if (tok.GetToken() == STRING) {
+        cout << "STRING" << endl;
+    }
+    else if (tok.GetToken() == BOOLEAN) {
+        cout << "BOOLEAN" << endl;
+    }
+    else if (tok.GetToken() == REAL) {
+        cout << "REAL" << endl;
+    }
+    else if (tok.GetToken() == THEN) {
+        cout << "THEN" << endl;
+    }
+    else if (tok.GetToken() == ERR) {
+        cout << "Error: {" << tok.GetLexeme() << "} at line no. " << tok.GetLinenum() + 1 << endl;
+    }
+    return out;
+}
+
+string upperCase(const std::string& input) {
+    std::string result = input;
+    for (char& c : result) {
+        c = toupper(c);
+    }
+    return result;
+}
+
+LexItem id_or_kw(const string& lexeme, int linenum) {
+
+    string upperCaseLexeme = upperCase(lexeme);
+
+    map<string, Token> keywordDict = {
+        {"AND", AND},
+        {"BEGIN", BEGIN},
+        {"BOOLEAN", BOOLEAN},
+        {"DIV", IDIV},
+        {"END", END},
+        {"ELSE", ELSE},
+        {"IF", IF},
+        {"INTEGER", INTEGER},
+        {"MOD", MOD},
+        {"NOT", NOT},
+        {"OR", OR},
+        {"THEN", THEN},
+        {"PROGRAM", PROGRAM},
+        {"REAL", REAL},
+        {"STRING", STRING},
+        {"WRITE", WRITE},
+        {"WRITELN", WRITELN},
+        {"VAR", VAR},
+        {"TRUE", BCONST},
+        {"FALSE", BCONST}
+    };
+
+    if (keywordDict.count(upperCaseLexeme)) {
+        return LexItem(keywordDict[upperCaseLexeme], lexeme, linenum);
+    }
+    else {
+        return LexItem(IDENT, lexeme, linenum);
+    }
+}
+
+LexItem getNextToken(istream& in, int& linenum) {
+    enum TokenState {
+        START,
+        ININT,
+        INID,
+        INSTRING,
+        INCOMMENT,
+        INREAL
+    };
+
+    string lexeme = "";
+    char ch;
+    TokenState state = START;
+
+    while (in.get(ch)) {
+        switch (state) {
+        case START:
+            if (ch == '\n') {
+                linenum += 1;
+                continue;
+            }
+
+            if (isspace(ch)) {
+                continue;
+            }
+
+            lexeme = ch;
+
+            if (ch == '\'') {
+                state = INSTRING;
+                continue;
+            }
+
+            if (isdigit(ch)) {
+                state = ININT;
+                continue;
+            }
+            else if ((isalpha(ch))) {
+                state = INID;
+                continue;
+            }
+            else if (ch == '{') {
+                state = INCOMMENT;
+                continue;
+            }
+
+
+            else if (ch == '+') {
+                return LexItem(PLUS, lexeme, linenum + 1);
+            }
+            else if (ch == '-') {
+                return LexItem(MINUS, lexeme, linenum + 1);
+            }
+            else if (ch == '*') {
+                return LexItem(MULT, lexeme, linenum + 1);
+            }
+            else if (ch == '/') {
+                return LexItem(DIV, lexeme, linenum + 1);
+            }
+            else if (ch == ':') {
+                if ((in.peek() == '=')) {
+                    in.get(ch);
+                    return LexItem(ASSOP, lexeme + ch, linenum + 1);
+                }
+                else {
+                    return LexItem(COLON, lexeme, linenum + 1);
+                }
+            }
+            else if (ch == '=') {
+                return LexItem(EQ, lexeme, linenum + 1);
+            }
+            else if (ch == '<') {
+                return LexItem(LTHAN, lexeme, linenum + 1);
+            }
+            else if (ch == '>') {
+                return LexItem(GTHAN, lexeme, linenum + 1);
+            }
+            else if (ch == ',') {
+                return LexItem(COMMA, lexeme, linenum + 1);
+            }
+            else if (ch == ';') {
+                return LexItem(SEMICOL, lexeme, linenum + 1);
+            }
+            else if (ch == '(') {
+                return LexItem(LPAREN, lexeme, linenum + 1);
+            }
+            else if (ch == ')') {
+                return LexItem(RPAREN, lexeme, linenum + 1);
+            }
+            else if (ch == '.') {
+                return LexItem(DOT, lexeme, linenum + 1);
+            }
+            else {
+                return LexItem(ERR, lexeme, linenum + 1);
+            }
+
+        case ININT:
+            if (isdigit(ch)) {
+                lexeme += ch;
+            }
+            else if (ch == '.') {
+                lexeme += ch;
+                state = INREAL;
+            }
+            else {
+                in.putback(ch);
+                return LexItem(ICONST, lexeme, linenum + 1);
+            }
+            continue;
+
+        case INREAL:
+            if (isdigit(ch)) {
+                lexeme += ch;
+            }
+            else if (ch == '.') {
+                lexeme += ch;
+                return LexItem(ERR, lexeme, linenum + 1);
+            }
+            else {
+                in.putback(ch);
+                return LexItem(RCONST, lexeme, linenum + 1);
+            }
+            continue;
+
+        case INID:
+            if (isalnum(ch) || ch == '_' || ch == '$') {
+                lexeme += ch;
+            }
+            else {
+                in.putback(ch);
+                LexItem checked = id_or_kw(lexeme, linenum + 1);
+                return checked;
+            }
+            continue;
+
+        case INSTRING:
+            if (ch == '\'') {
+                lexeme += ch;
+                return LexItem(SCONST, lexeme, linenum + 1);
+            }
+            else if (ch == '\n') {
+                return LexItem(ERR, lexeme, linenum + 1);
+            }
+            else {
+                lexeme += ch;
+            }
+            continue;
+
+        case INCOMMENT:
+            if (ch == '}') {
+                lexeme += ch;
+                state = START;
+                lexeme = "";
+            }
+            else {
+                lexeme += ch;
+                if (ch == '\n') {
+                    linenum += 1;
+                }
+            }
+
+            continue;
+        }
+    }
+    return LexItem(DONE, "", linenum);
+}
